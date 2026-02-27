@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import User from '../models/userModel.js';
-import Portfolio from '../models/portfolioModel.js';
 import Transaction from '../models/transactionModel.js';
+import { getCurrentPrice } from '../services/marketService.js';
 
 // @desc    Buy a stock
 // @route   POST /api/trade/buy
@@ -16,91 +16,97 @@ export const buyStock = asyncHandler(async (req, res) => {
     throw new Error('Please provide valid stockSymbol, quantity, and price');
   }
 
-  const totalCost = quantity * price;
-
-  // Start a Mongoose session for atomic transaction
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    // 1. Check user balance
     const user = await User.findById(userId).session(session);
-    
     if (!user) {
       throw new Error('User not found');
     }
 
-    if (user.demoBalance < totalCost) {
+    const isDemo = user.activeAccountType === 'demo';
+    
+    // In Real Mode, ignore the user-submitted price and fetch the live market price
+    let executionPrice = price;
+    if (!isDemo) {
+      try {
+        executionPrice = await getCurrentPrice(stockSymbol);
+      } catch (marketError) {
+        // Fallback to submitted price if live api is dead
+        console.warn(`Real Mode live fetch failed for buy. Using submitted price for ${stockSymbol}.`);
+      }
+    }
+
+    const totalCost = quantity * executionPrice;
+    const currentBalance = isDemo ? user.demoBalance : user.realBalance;
+
+    if (currentBalance < totalCost) {
       res.status(400);
-      throw new Error('Insufficient demo balance');
+      throw new Error(`Insufficient ${isDemo ? 'demo' : 'real'} balance`);
     }
 
-    // 2. Deduct balance
-    user.demoBalance -= totalCost;
-    await user.save({ session });
-
-    // 3. Update holdings in Portfolio
-    let portfolio = await Portfolio.findOne({ userId }).session(session);
-
-    if (!portfolio) {
-      // Create new portfolio if it doesn't exist
-      portfolio = new Portfolio({
-        userId,
-        holdings: [],
-      });
+    // Deduct balance
+    if (isDemo) {
+      user.demoBalance -= totalCost;
+    } else {
+      user.realBalance -= totalCost;
     }
 
-    // Check if the stock already exists in the portfolio
-    const existingHoldingIndex = portfolio.holdings.findIndex(
+    // Update holdings
+    const portfolioKey = isDemo ? 'demoPortfolio' : 'realPortfolio';
+    let portfolio = user[portfolioKey] || [];
+    
+    const existingIndex = portfolio.findIndex(
       (h) => h.stockSymbol.toUpperCase() === stockSymbol.toUpperCase()
     );
 
-    if (existingHoldingIndex >= 0) {
-      // Update existing holding: calculate new average price
-      const holding = portfolio.holdings[existingHoldingIndex];
+    if (existingIndex >= 0) {
+      const holding = portfolio[existingIndex];
       const totalOldValue = holding.quantity * holding.averagePrice;
       const newTotalValue = totalOldValue + totalCost;
       const newQuantity = holding.quantity + quantity;
       
       holding.quantity = newQuantity;
       holding.averagePrice = newTotalValue / newQuantity;
+      portfolio[existingIndex] = holding;
     } else {
-      // Add new holding
-      portfolio.holdings.push({
+      portfolio.push({
         stockSymbol: stockSymbol.toUpperCase(),
         quantity,
-        averagePrice: price,
+        averagePrice: executionPrice,
       });
     }
 
-    await portfolio.save({ session });
+    // Explicitly mark array as modified since it's Mixed type or Array
+    user.markModified(portfolioKey);
+    await user.save({ session });
 
-    // 4. Save transaction logic
+    // Save transaction
     const transaction = new Transaction({
       userId,
       stockSymbol,
       quantity,
-      price,
+      price: executionPrice,
       type: 'buy',
+      // We could add accountType: isDemo ? 'demo' : 'real' here if schema supported it
     });
 
     await transaction.save({ session });
 
-    // Commit transaction
     await session.commitTransaction();
     session.endSession();
 
     res.status(201).json({
       message: 'Stock purchased successfully',
       transaction,
-      newBalance: user.demoBalance,
+      newBalance: isDemo ? user.demoBalance : user.realBalance,
+      activeAccountType: user.activeAccountType,
+      portfolio: user[portfolioKey]
     });
   } catch (error) {
-    // Abort transaction in case of any failure
     await session.abortTransaction();
     session.endSession();
-    
-    // Pass the error to the asyncHandler
     throw error;
   }
 });
@@ -117,71 +123,89 @@ export const sellStock = asyncHandler(async (req, res) => {
     throw new Error('Please provide valid stockSymbol, quantity, and price');
   }
 
-  const totalRevenue = quantity * price;
-
-  // Start a Mongoose session for atomic transaction
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    // 1. Get Portfolio & Check if stock is held
-    const portfolio = await Portfolio.findOne({ userId }).session(session);
-
-    if (!portfolio) {
-      res.status(400);
-      throw new Error('Portfolio not found');
+    const user = await User.findById(userId).session(session);
+    if (!user) {
+      throw new Error('User not found');
     }
 
-    const holdingIndex = portfolio.holdings.findIndex(
+    const isDemo = user.activeAccountType === 'demo';
+    
+    // In Real Mode, ignore user-submitted price and fetch actual market price
+    let executionPrice = price;
+    if (!isDemo) {
+      try {
+        executionPrice = await getCurrentPrice(stockSymbol);
+      } catch (marketError) {
+        // Fallback to submitted price if live api is dead
+        console.warn(`Real Mode live fetch failed for sell. Using submitted price for ${stockSymbol}.`);
+      }
+    }
+
+    const totalRevenue = quantity * executionPrice;
+    
+    const portfolioKey = isDemo ? 'demoPortfolio' : 'realPortfolio';
+    let portfolio = user[portfolioKey] || [];
+
+    const holdingIndex = portfolio.findIndex(
       (h) => h.stockSymbol.toUpperCase() === stockSymbol.toUpperCase()
     );
 
     if (holdingIndex === -1) {
       res.status(400);
-      throw new Error('You do not own this stock');
+      throw new Error('You do not own this stock in your active account');
     }
 
-    const holding = portfolio.holdings[holdingIndex];
+    const holding = portfolio[holdingIndex];
 
     if (holding.quantity < quantity) {
       res.status(400);
       throw new Error(`Insufficient shares. You only own ${holding.quantity} shares.`);
     }
 
-    // 2. Update quantity in holdings
+    // Update holding quantity
     holding.quantity -= quantity;
 
-    // If quantity is 0, optionally remove the holding from the array
     if (holding.quantity === 0) {
-      portfolio.holdings.splice(holdingIndex, 1);
+      portfolio.splice(holdingIndex, 1);
+    } else {
+      portfolio[holdingIndex] = holding;
     }
-    
-    await portfolio.save({ session });
 
-    // 3. Add balance to User
-    const user = await User.findById(userId).session(session);
-    user.demoBalance += totalRevenue;
+    user.markModified(portfolioKey);
+
+    // Add balance to User
+    if (isDemo) {
+      user.demoBalance += totalRevenue;
+    } else {
+      user.realBalance += totalRevenue;
+    }
+
     await user.save({ session });
 
-    // 4. Save transaction logic
+    // Save transaction
     const transaction = new Transaction({
       userId,
       stockSymbol,
       quantity,
-      price,
+      price: executionPrice,
       type: 'sell',
     });
 
     await transaction.save({ session });
 
-    // Commit transaction
     await session.commitTransaction();
     session.endSession();
 
     res.status(200).json({
       message: 'Stock sold successfully',
       transaction,
-      newBalance: user.demoBalance,
+      newBalance: isDemo ? user.demoBalance : user.realBalance,
+      activeAccountType: user.activeAccountType,
+      portfolio: user[portfolioKey]
     });
   } catch (error) {
     await session.abortTransaction();
@@ -200,4 +224,36 @@ export const getTransactionHistory = asyncHandler(async (req, res) => {
   const transactions = await Transaction.find({ userId }).sort({ date: -1 });
 
   res.status(200).json(transactions);
+});
+
+// @desc    Get live quote for a stock
+// @route   GET /api/trade/quote/:symbol
+// @access  Private
+export const getQuote = asyncHandler(async (req, res) => {
+  const { symbol } = req.params;
+  const userId = req.user._id;
+
+  const user = await User.findById(userId);
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  const isDemo = user.activeAccountType === 'demo';
+
+  if (!isDemo) {
+    try {
+      const price = await getCurrentPrice(symbol);
+      return res.status(200).json({ symbol, price });
+    } catch (error) {
+      // Fallback for demo/hackathon so user isn't fully blocked
+      console.warn(`Live API failed for ${symbol}, using mock price.`);
+      const mockPrice = parseFloat((Math.random() * 450 + 50).toFixed(2));
+      return res.status(200).json({ symbol, price: mockPrice, simulated: true });
+    }
+  }
+
+  // Generate a mock price between 50 and 500 for demo mode if not available
+  const mockPrice = parseFloat((Math.random() * 450 + 50).toFixed(2));
+  res.status(200).json({ symbol, price: mockPrice });
 });

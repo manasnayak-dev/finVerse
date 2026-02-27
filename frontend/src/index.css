@@ -1,0 +1,262 @@
+@import "tailwindcss";
+
+/* ─── LUXURY THEME TOKENS ──────────────────────────────────────── */
+@theme {
+  --color-dark:       #050812;
+  --color-darker:     #020610;
+  --color-card:       rgba(8, 14, 35, 0.65);
+  --color-primary:    #00d4ff;
+  --color-secondary:  #7c3aed;
+  --color-accent:     #22c55e;
+  --color-gold:       #f5c842;
+}
+
+/* ─── GLOBAL RESET ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  /* Deep navy / near-black matching the image */
+  background-color: #060a18;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0, 80, 180, 0.22) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(124, 58, 237, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 30% at 0% 100%, rgba(0, 212, 255, 0.08) 0%, transparent 60%);
+  background-attachment: fixed;
+  color: #e2e8f0;
+  font-family: 'Inter', system-ui, sans-serif;
+  /* Subtle animated grain texture */
+  animation: bgPulse 10s ease-in-out infinite alternate;
+}
+
+/* ─── KEYFRAME ANIMATIONS ───────────────────────────────────────── */
+
+@keyframes bgPulse {
+  0%   { background-color: #060a18; }
+  100% { background-color: #080d20; }
+}
+
+@keyframes float {
+  0%,100% { transform: translateY(0px);  }
+  50%      { transform: translateY(-8px); }
+}
+
+@keyframes glowPulse {
+  0%,100% { box-shadow: 0 0 20px rgba(0,212,255,0.15), 0 0 40px rgba(0,212,255,0.05); }
+  50%     { box-shadow: 0 0 30px rgba(0,212,255,0.30), 0 0 60px rgba(0,212,255,0.12); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0);     }
+}
+
+@keyframes rotateGlow {
+  0%   { transform: rotate(0deg);   }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0   rgba(0,212,255,0.4); }
+  70%  { box-shadow: 0 0 0 12px rgba(0,212,255,0);  }
+  100% { box-shadow: 0 0 0 0   rgba(0,212,255,0);   }
+}
+
+@keyframes borderGlow {
+  0%, 100% { border-color: rgba(0,212,255,0.2); }
+  50%       { border-color: rgba(0,212,255,0.5); }
+}
+
+/* ─── UTILITY CLASSES ───────────────────────────────────────────── */
+
+/* Main glass panel */
+@utility glass {
+  background: rgba(8, 14, 40, 0.60);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+
+  &:hover {
+    border-color: rgba(0, 212, 255, 0.25);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.6),
+      0 0 20px rgba(0, 212, 255, 0.06),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+}
+
+/* Elevated card with glow */
+@utility glass-premium {
+  background: rgba(8, 14, 40, 0.75);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid rgba(0, 212, 255, 0.18);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.7),
+    0 0 40px rgba(0, 212, 255, 0.05),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* Text gradient — cyan → purple */
+@utility text-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(135deg, #00d4ff 0%, #a78bfa 50%, #22c55e 100%);
+  background-size: 200% auto;
+  animation: shimmer 4s linear infinite;
+}
+
+/* Gold gradient text */
+@utility text-gold {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(135deg, #f5c842 0%, #fbbf24 50%, #f59e0b 100%);
+}
+
+/* Scrollbar hide */
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+/* Float animation helper */
+@utility animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Glow ring on focus/active elements */
+@utility glow-ring {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* Animated border */
+@utility border-pulse {
+  animation: borderGlow 3s ease-in-out infinite;
+}
+
+/* Entry animation */
+@utility animate-in {
+  animation: fadeInUp 0.5s ease-out both;
+}
+
+/* ─── GLOBAL COMPONENT OVERRIDES ────────────────────────────────── */
+
+/* Radiant orbs positioned behind content */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(80px);
+  opacity: 0.12;
+}
+
+body::before {
+  width: 600px;
+  height: 600px;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, #0055ff 0%, transparent 70%);
+  animation: float 12s ease-in-out infinite;
+}
+
+body::after {
+  width: 400px;
+  height: 400px;
+  bottom: -100px;
+  right: -100px;
+  background: radial-gradient(circle, #7c3aed 0%, transparent 70%);
+  animation: float 16s ease-in-out infinite reverse;
+}
+
+/* Ensure content sits above orbs */
+#root { position: relative; z-index: 1; }
+
+/* Input fields luxury style */
+input, textarea, select {
+  background: rgba(6, 10, 30, 0.7) !important;
+  border-color: rgba(0, 212, 255, 0.15) !important;
+  transition: border-color 0.3s, box-shadow 0.3s;
+
+  &:focus {
+    border-color: rgba(0, 212, 255, 0.45) !important;
+    box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.10) !important;
+    outline: none;
+  }
+}
+
+/* Luxury button base */
+button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Sidebar glass nav */
+nav.glass {
+  background: rgba(4, 8, 24, 0.80);
+  border-right: 1px solid rgba(0, 212, 255, 0.10);
+  box-shadow: 4px 0 40px rgba(0, 0, 0, 0.6);
+}
+
+/* Active nav item glows */
+nav .text-primary {
+  text-shadow: 0 0 12px rgba(0, 212, 255, 0.6);
+}
+
+/* Custom scrollbar (non-hidden) */
+::-webkit-scrollbar               { width: 6px; height: 6px; }
+::-webkit-scrollbar-track         { background: rgba(8, 14, 40, 0.4); }
+::-webkit-scrollbar-thumb         { background: rgba(0, 212, 255, 0.25); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover   { background: rgba(0, 212, 255, 0.45); }
+
+/* Card entry stagger animation */
+.stagger-1 { animation: fadeInUp 0.5s 0.05s ease-out both; }
+.stagger-2 { animation: fadeInUp 0.5s 0.10s ease-out both; }
+.stagger-3 { animation: fadeInUp 0.5s 0.15s ease-out both; }
+.stagger-4 { animation: fadeInUp 0.5s 0.20s ease-out both; }
+.stagger-5 { animation: fadeInUp 0.5s 0.25s ease-out both; }
+.stagger-6 { animation: fadeInUp 0.5s 0.30s ease-out both; }
+
+/* Table row hover */
+tr { transition: background-color 0.2s ease; }
+tr:hover { background: rgba(0, 212, 255, 0.04) !important; }
+
+/* Glow separator */
+.glow-sep {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,212,255,0.4), transparent);
+}
+
+/* Orb decorations inside cards */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(50px);
+  pointer-events: none;
+  opacity: 0.10;
+  z-index: 0;
+}
+
+.orb-cyan  { background: #00d4ff; }
+.orb-purple{ background: #7c3aed; }
+.orb-green { background: #22c55e; }

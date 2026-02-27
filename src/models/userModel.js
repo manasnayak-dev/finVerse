@@ -20,6 +20,31 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 100000,
     },
+    realBalance: {
+      type: Number,
+      default: 0,
+    },
+    activeAccountType: {
+      type: String,
+      enum: ['demo', 'real'],
+      default: 'demo',
+    },
+    demoPortfolio: {
+      type: Array,
+      default: [],
+    },
+    realPortfolio: {
+      type: Array,
+      default: [],
+    },
+    activeSIPs: {
+      type: Array,
+      default: [],
+    },
+    cryptoPortfolio: {
+      type: Array,
+      default: [],
+    },
     role: {
       type: String,
       default: 'user',
@@ -34,7 +59,7 @@ const userSchema = new mongoose.Schema(
 userSchema.pre('save', async function (next) {
   // Only hash the password if it has been modified (or is new)
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
 
   const salt = await bcrypt.genSalt(10);

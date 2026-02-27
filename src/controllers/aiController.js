@@ -13,16 +13,42 @@ export const chatWithAI = asyncHandler(async (req, res) => {
   }
 
   try {
+    const isDemo = req.user?.activeAccountType === 'demo';
+    const balance = isDemo ? req.user?.demoBalance : req.user?.realBalance;
+    const portfolio = isDemo ? req.user?.demoPortfolio : req.user?.realPortfolio;
+    
+    const contextPrompt = `
+      You are an expert financial advisor for the FinVerse platform.
+      The user is currently using a ${isDemo ? 'SIMULATED DEMO' : 'LIVE REAL'} account.
+      Their current balance is $${balance}.
+      Their current portfolio holdings are: ${JSON.stringify(portfolio)}.
+      
+      User Message: "${message}"
+      
+      Provide a helpful, precise reply. Do not use markdown blocks for standard conversation unless showing code.
+    `;
+
     const model = getGeminiModel();
-    const result = await model.generateContent(message);
+    const result = await model.generateContent(contextPrompt);
     const response = await result.response;
     const text = response.text();
 
     res.status(200).json({ response: text });
   } catch (error) {
     console.error('AI Chat Error:', error);
+    
+    // Defensive Check for Rate Limits (429) & Quota Issues
+    if (error.status === 429 || error.message?.includes('429') || error.message?.includes('Quota')) {
+      const isDemo = req.user?.activeAccountType === 'demo';
+      const balance = isDemo ? req.user?.demoBalance : req.user?.realBalance;
+      
+      return res.status(200).json({ 
+        response: `⚠️ **[API Rate Limit Reached]**\n\nThe Google Gemini Live API is currently experiencing unusually high demand and your free tier quota is temporarily exhausted.\n\nHowever, I can still see you are in **${isDemo ? 'Demo Mode' : 'Real Accounts Mode'}** and your active balance is **$${balance?.toLocaleString()}**.\n\nPlease try again in a few minutes when the API quota resets!`
+      });
+    }
+
     res.status(500);
-    throw new Error('Failed to generate AI response');
+    throw new Error(`Failed to generate AI response: ${error.message}`);
   }
 });
 

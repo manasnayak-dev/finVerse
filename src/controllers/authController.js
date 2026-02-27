@@ -38,7 +38,11 @@ export const registerUser = asyncHandler(async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      activeAccountType: user.activeAccountType,
       demoBalance: user.demoBalance,
+      realBalance: user.realBalance,
+      demoPortfolio: user.demoPortfolio,
+      realPortfolio: user.realPortfolio,
       token,
     });
   } else {
@@ -72,7 +76,11 @@ export const loginUser = asyncHandler(async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      activeAccountType: user.activeAccountType,
       demoBalance: user.demoBalance,
+      realBalance: user.realBalance,
+      demoPortfolio: user.demoPortfolio,
+      realPortfolio: user.realPortfolio,
       token,
     });
   } else {
@@ -94,7 +102,11 @@ export const getProfile = asyncHandler(async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      activeAccountType: user.activeAccountType,
       demoBalance: user.demoBalance,
+      realBalance: user.realBalance,
+      demoPortfolio: user.demoPortfolio,
+      realPortfolio: user.realPortfolio,
     });
   } else {
     res.status(404);
